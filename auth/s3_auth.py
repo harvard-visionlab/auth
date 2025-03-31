@@ -3,11 +3,36 @@ import boto3
 from botocore.configloader import load_config
 
 __all__ = [
-    'get_aws_credentials', 
+    'get_aws_credentials_with_provider_hint',    
+    'get_aws_credentials',     
     'get_storage_options',
     'get_s5cmd_options'
 ]
-            
+
+def get_aws_credentials_with_provider_hint(provider, profile=None, endpoint_url=None, region='us-east-1'):
+    '''attempts to find s3 credentials for the given provider'''
+
+    # specified profile takes precedence
+    if profile is not None:
+        return get_aws_credentials(profile=profile, endpoint_url=endpoint_url, region=region)
+
+    # assume a profile named after the provider
+    creds = get_aws_credentials(profile=provider, 
+                                endpoint_url=endpoint_url, 
+                                region=region)
+
+    # try all uppercase (env variable convention
+    if not creds:
+        creds = get_aws_credentials(profile=provider.upper(), 
+                                    endpoint_url=endpoint_url, 
+                                    region=region)
+
+    # fallback to default credentials
+    if not creds:
+        creds = get_aws_credentials(profile=profile, endpoint_url=endpoint_url, region=region)
+        
+    return creds
+        
 def get_aws_credentials(profile=None, endpoint_url=None, region='us-east-1'):
     """
     Retrieve AWS credentials from a boto3 session or from a credentials file.
@@ -64,8 +89,8 @@ def get_aws_credentials(profile=None, endpoint_url=None, region='us-east-1'):
             endpoint_url = os.getenv(f"AWS_ENDPOINT_URL_{profile_name}", os.environ.get("AWS_ENDPOINT_URL", endpoint_url))
             
             if not aws_access_key_id or not aws_secret_access_key:
-                raise ValueError(f"Missing required credentials in environment variables for profile '{profile_name}'; AWS_ACCESS_KEY_ID_{profile.upper()} and AWS_SECRET_ACCESS_KEY_{profile.upper()}.")
-            
+                return {}
+
             ret = {
                 'aws_access_key_id': aws_access_key_id,
                 'aws_secret_access_key': aws_secret_access_key,

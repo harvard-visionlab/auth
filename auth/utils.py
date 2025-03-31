@@ -1,7 +1,7 @@
 from urllib.parse import urlparse
 from pathlib import Path
 
-PROVIDER_ENDPOINT_URLS = {
+S3_PROVIDER_ENDPOINT_URLS = {
     "s3": "https://s3.amazonaws.com",
     "aws": "https://s3.amazonaws.com",
     "wasabi": "https://s3.wasabisys.com",
@@ -35,7 +35,7 @@ def parse_uri(uri: str) -> tuple[str, str, str, str | None]:
     if scheme in ['http', 'https']:
         endpoint_hint = f"{parsed.scheme}://{parsed.netloc}"
         # Path style: https://s3.amazonaws.com/bucket/key
-        if parsed.netloc.startswith("s3.") or any(ep_url.endswith(parsed.netloc) for ep_url in PROVIDER_ENDPOINT_URLS.values()):
+        if parsed.netloc.startswith("s3.") or any(ep_url.endswith(parsed.netloc) for ep_url in S3_PROVIDER_ENDPOINT_URLS.values()):
              path_parts = parsed.path.lstrip('/').split('/', 1)
              if len(path_parts) >= 1 and path_parts[0]:
                  bucket = path_parts[0]
@@ -43,7 +43,7 @@ def parse_uri(uri: str) -> tuple[str, str, str, str | None]:
              else:
                  raise ValueError(f"Invalid path-style URL: Cannot extract bucket: {uri}")
         # Virtual hosted style: https://bucket.s3.amazonaws.com/key
-        elif ".s3." in parsed.netloc or any(f".{ep_domain}" in parsed.netloc for ep_domain in [urlparse(url).netloc for url in PROVIDER_ENDPOINT_URLS.values() if url]): # Check against known endpoint domains
+        elif ".s3." in parsed.netloc or any(f".{ep_domain}" in parsed.netloc for ep_domain in [urlparse(url).netloc for url in S3_PROVIDER_ENDPOINT_URLS.values() if url]): # Check against known endpoint domains
              # Basic assumption: bucket is the first part of the hostname
              # This might need refinement for complex endpoint structures
              potential_bucket = parsed.netloc.split('.')[0]
@@ -68,7 +68,7 @@ def parse_uri(uri: str) -> tuple[str, str, str, str | None]:
             else:
                  raise ValueError(f"Unrecognized HTTPS URL format: {uri}")
 
-    elif scheme in PROVIDER_ENDPOINT_URLS:
+    elif scheme in S3_PROVIDER_ENDPOINT_URLS:
         bucket = parsed.netloc
         key = parsed.path.lstrip('/')
         if not bucket:

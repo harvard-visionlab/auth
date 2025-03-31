@@ -11,15 +11,15 @@ from urllib.parse import urlparse
 
 from pdb import set_trace
 
-from .utils import PROVIDER_ENDPOINT_URLS, parse_uri, normalize_uri
+from .utils import S3_PROVIDER_ENDPOINT_URLS, DEFAULT_AWS_REGION, parse_uri, normalize_uri
 from .s3_auth import get_aws_credentials
 
 __all__ = [
     'create_s3_client',
     'check_public_s3_object',
     'check_s3_file_access',
-    'count_s3_objects',
-    # 'is_bucket_folder',
+    'count_objects_in_bucket_prefix',
+    'list_objects_in_bucket_prefix',
     # 'is_bucket_file',
 ]
 
@@ -80,7 +80,7 @@ def create_s3_client(s3_path, region=None, endpoint_url=None, profile=None):
     if is_public:
         # Public access: initialize client without credentials.
         if endpoint_url is None:
-            endpoint_url = PROVIDER_ENDPOINT_URLS.get(scheme)
+            endpoint_url = S3_PROVIDER_ENDPOINT_URLS.get(scheme)
         try:
             client = boto3.client(
                 's3',
@@ -104,7 +104,7 @@ def create_s3_client(s3_path, region=None, endpoint_url=None, profile=None):
 
         # Use passed endpoint_url if provided; otherwise, try credentials or fallback.
         if endpoint_url is None:
-            endpoint_url = creds.get('endpoint_url', PROVIDER_ENDPOINT_URLS.get(scheme))
+            endpoint_url = creds.get('endpoint_url', S3_PROVIDER_ENDPOINT_URLS.get(scheme))
         try:
             client = boto3.client(
                 's3',
@@ -165,8 +165,8 @@ def check_public_s3_object(
     if not final_endpoint_url:
         if scheme in ['http', 'https'] and parsed_endpoint:
             final_endpoint_url = parsed_endpoint
-        elif scheme in PROVIDER_ENDPOINT_URLS:
-            final_endpoint_url = PROVIDER_ENDPOINT_URLS[scheme]
+        elif scheme in S3_PROVIDER_ENDPOINT_URLS:
+            final_endpoint_url = S3_PROVIDER_ENDPOINT_URLS[scheme]
         elif scheme not in ['http', 'https']: # Unknown scheme, but provider-like
             # Log endpoint warnings as WARNING
             logger.warning(f"No endpoint configured for scheme '{scheme}' in URI '{uri}'. Attempting without specific endpoint.")
@@ -247,10 +247,10 @@ def construct_s3_url_from_s3_uri(s3_path, endpoint_url=None, region=None):
         s3_url = s3_path
     else:
         if endpoint_url is None:
-            if not scheme in PROVIDER_ENDPOINT_URLS:
+            if not scheme in S3_PROVIDER_ENDPOINT_URLS:
                 raise ValueError(f"Unknown s3 provider: {scheme}. Pass in and `endpoint_url` for this provider, or modify s3_info.py to include it.")
                 
-            endpoint_url = PROVIDER_ENDPOINT_URLS[scheme]
+            endpoint_url = S3_PROVIDER_ENDPOINT_URLS[scheme]
             
         if region is not None:
             endpoint_url = endpoint_url.replace("s3.", f"s3.{region}.")
@@ -282,7 +282,7 @@ def check_s3_file_access(s3_path, endpoint_url=None, region=None, profile=None):
     if is_public:        
         # Public access: Initialize the S3 client without credentials
         if endpoint_url is None:
-            endpoint_url = PROVIDER_ENDPOINT_URLS.get(scheme)            
+            endpoint_url = S3_PROVIDER_ENDPOINT_URLS.get(scheme)            
         try:
             s3 = boto3.client('s3',
                                     region_name=region,
@@ -303,8 +303,8 @@ def check_s3_file_access(s3_path, endpoint_url=None, region=None, profile=None):
 
         # passed endpoint_url takes precedence
         if endpoint_url is None:
-            # use endpoint_url from credentials; fallback to PROVIDER_ENDPOINT_URLS[scheme]
-            endpoint_url = creds.get('endpoint_url', PROVIDER_ENDPOINT_URLS.get(scheme))
+            # use endpoint_url from credentials; fallback to S3_PROVIDER_ENDPOINT_URLS[scheme]
+            endpoint_url = creds.get('endpoint_url', S3_PROVIDER_ENDPOINT_URLS.get(scheme))
         
         try:
             s3 = boto3.client(
