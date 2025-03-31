@@ -80,9 +80,6 @@ def parse_uri(uri: str) -> tuple[str, str, str, str | None]:
         if not bucket:
              raise ValueError(f"Invalid URI: Bucket name missing for scheme '{scheme}': {uri}")
         print(f"Warning: Unrecognized scheme '{scheme}'. Assuming format 'scheme://bucket/key'.")
-
-    if key == "":
-        key = "."
         
     return scheme, bucket, key, endpoint_hint
     

@@ -3,12 +3,13 @@ import boto3
 from botocore.configloader import load_config
 
 __all__ = [
-    'get_aws_credentials_with_provider_hint',    
+    'get_aws_credentials_with_provider_hint',  
+    'get_s5cmd_options_with_provider_hint', 
     'get_aws_credentials',     
     'get_storage_options',
     'get_s5cmd_options'
 ]
-
+    
 def get_aws_credentials_with_provider_hint(provider, profile=None, endpoint_url=None, region='us-east-1'):
     '''attempts to find s3 credentials for the given provider'''
 
@@ -144,8 +145,7 @@ def get_storage_options(profile=None):
         ret['endpoint_url'] = creds['endpoint_url']
     return ret
 
-def get_s5cmd_options(profile=None):
-    creds = get_aws_credentials(profile)
+def _set_s5cmd_options_from_credentials(creds):
     env = None
     aws_access_key_id = creds.get('aws_access_key_id')
     aws_secret_access_key = creds.get('aws_secret_access_key')
@@ -158,4 +158,18 @@ def get_s5cmd_options(profile=None):
         }
         if region:
             env['AWS_REGION'] = region
+    return env, endpoint_url
+    
+def get_s5cmd_options_with_provider_hint(provider, profile=None, endpoint_url=None, region=None):
+    creds = get_aws_credentials_with_provider_hint(provider, 
+                                                   profile=profile, 
+                                                   endpoint_url=endpoint_url, 
+                                                   region=region)
+    
+    env, endpoint_url = _set_s5cmd_options_from_credentials(creds)
+    return env, endpoint_url
+    
+def get_s5cmd_options(profile=None, endpoint_url=None, region=None):
+    creds = get_aws_credentials(profile, endpoint_url=endpoint_url, region=region)
+    env, endpoint_url = _set_s5cmd_options_from_credentials(creds)
     return env, endpoint_url

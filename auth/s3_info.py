@@ -13,10 +13,10 @@ from pdb import set_trace
 
 from .utils import S3_PROVIDER_ENDPOINT_URLS, DEFAULT_AWS_REGION, parse_uri, normalize_uri
 from .s3_auth import get_aws_credentials
+from .s3_public import check_public_s3_object
 
 __all__ = [
     'create_s3_client',
-    'check_public_s3_object',
     'check_s3_file_access',
     'count_objects_in_bucket_prefix',
     'list_objects_in_bucket_prefix',
@@ -120,116 +120,7 @@ def create_s3_client(s3_path, region=None, endpoint_url=None, profile=None):
             return None
             
 
-def check_private_s3_object(
-        uri: str,
-        region: str | None = None,
-        endpoint_url: str | None = None,
-        timeout: int = 5
-    ) -> bool:
-    
-    return not check_public_s3_object(uri, region, endpoint_url, timeout)
-    
-def check_public_s3_object(
-    uri: str,
-    region: str | None = None,
-    endpoint_url: str | None = None,
-    timeout: int = 5
-) -> bool:
-    """
-    Checks if an S3-like object is publicly readable via anonymous S3 API call.
-    Uses standard Python logging for output. Configure logging level externally.
-
-    Args:
-        uri: The S3 URI or HTTPS URL of the object.
-        region: The AWS region (e.g., 'us-west-2'). Important for AWS.
-                If None for AWS, defaults to 'us-east-1'. May be ignored by other providers.
-        endpoint_url: Explicit S3-compatible endpoint URL. Overrides provider defaults.
-        timeout: Connection timeout in seconds for the S3 client.
-
-    Returns:
-        True if the object exists and head_object succeeds anonymously, False otherwise.
-
-    Raises:
-        ValueError: If the URI format is invalid (if not caught internally).
-                     Currently, it logs error and returns False.
-    """
-    try:
-        scheme, bucket, key, parsed_endpoint = parse_uri(uri)
-    except ValueError as e:
-        # Log parsing errors as ERROR
-        logger.error(f"Error parsing URI '{uri}': {e}")
-        return False
-
-    # Determine endpoint URL
-    final_endpoint_url = endpoint_url # User override takes precedence
-    if not final_endpoint_url:
-        if scheme in ['http', 'https'] and parsed_endpoint:
-            final_endpoint_url = parsed_endpoint
-        elif scheme in S3_PROVIDER_ENDPOINT_URLS:
-            final_endpoint_url = S3_PROVIDER_ENDPOINT_URLS[scheme]
-        elif scheme not in ['http', 'https']: # Unknown scheme, but provider-like
-            # Log endpoint warnings as WARNING
-            logger.warning(f"No endpoint configured for scheme '{scheme}' in URI '{uri}'. Attempting without specific endpoint.")
-            final_endpoint_url = None # Let boto3 try default resolution
-
-    # Determine region (primarily for AWS)
-    final_region = region
-    if not final_region and scheme in ['s3', 'aws'] and final_endpoint_url and 'amazonaws.com' in final_endpoint_url :
-        match = re.search(r's3\.([a-z0-9-]+)\.amazonaws\.com', final_endpoint_url)
-        if match:
-            final_region = match.group(1)
-        else:
-            final_region = DEFAULT_AWS_REGION
-
-    # Log detailed check parameters at DEBUG level
-    logger.debug(f"Checking URI: {uri}")
-    logger.debug(f"  Provider Scheme: {scheme}")
-    logger.debug(f"  Bucket: {bucket}")
-    logger.debug(f"  Key: {key}")
-    logger.debug(f"  Target Endpoint: {final_endpoint_url}")
-    logger.debug(f"  Target Region: {final_region}")
-
-    try:
-        s3_client = boto3.client(
-            's3',
-            config=Config(signature_version=UNSIGNED, connect_timeout=timeout, read_timeout=timeout),
-            endpoint_url=final_endpoint_url,
-            region_name=final_region
-        )
-        s3_client.head_object(Bucket=bucket, Key=key)
-        # Log success at INFO level (or DEBUG if you prefer)
-        logger.info(f"Success: Object readable at '{uri}'")
-        # logger.debug(f"  Success details: Object '{key}' in bucket '{bucket}' is publicly readable via S3 API.")
-        return True
-
-    except (ClientError, NoCredentialsError) as e:
-        if isinstance(e, ClientError):
-            error_code = e.response.get("Error", {}).get("Code")
-            error_message = e.response.get("Error", {}).get("Message", str(e))
-            if error_code == '404' or error_code == 'NoSuchKey':
-                # Log not found as INFO or WARNING - it's a valid check result, not necessarily an error in the *checker*. Let's use INFO.
-                logger.info(f"Object not found (404) at '{uri}'. Message: {error_message}")
-            elif error_code == '403' or error_code == 'AccessDenied':
-                # Log access denied as INFO - also a valid check result.
-                logger.info(f"Access denied (403) for anonymous user at '{uri}'. Message: {error_message}")
-            elif error_code == '301' and 'Endpoint' in e.response.get("Error", {}):
-                wrong_region_endpoint = e.response['Error']['Endpoint']
-                # Log redirects as WARNING as they indicate potential misconfiguration
-                logger.warning(f"Permanent redirect (301) checking '{uri}', possibly wrong region. Suggested endpoint: {wrong_region_endpoint}. Message: {error_message}")
-            else:
-                # Log other S3 client errors as ERROR
-                logger.error(f"S3 ClientError checking '{uri}': Code={error_code}. Message: {error_message}", exc_info=True) # exc_info adds traceback
-        elif isinstance(e, NoCredentialsError):
-             # This is unexpected with UNSIGNED, log as ERROR
-             logger.error(f"Boto3 configuration error (NoCredentialsError) checking '{uri}': {e}", exc_info=True)
-        else:
-             # Log unexpected boto errors as ERROR
-             logger.error(f"Unexpected Boto3/Botocore error checking '{uri}': {e}", exc_info=True)
-        return False
-    except Exception as e:
-        # Log other unexpected exceptions as ERROR. Use logger.exception for traceback.
-        logger.exception(f"Unexpected exception during check for '{uri}': {e}")
-        return False
+  
 
 def construct_s3_url_from_s3_uri(s3_path, endpoint_url=None, region=None):
     """Convert s3://bucket-name/object-key into an endpoint_url/bucket-name/bucket-key url
