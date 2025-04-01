@@ -14,9 +14,10 @@ from pdb import set_trace
 from .utils import S3_PROVIDER_ENDPOINT_URLS, DEFAULT_AWS_REGION, parse_uri, normalize_uri
 from .s3_auth import get_aws_credentials
 from .s3_public import check_public_s3_object
+from .s3_client import create_s3_client
 
 __all__ = [
-    'create_s3_client',
+    # 'create_s3_client',
     'check_s3_file_access',
     'count_objects_in_bucket_prefix',
     'list_objects_in_bucket_prefix',
@@ -59,68 +60,6 @@ def _log_s3_client_error(e: ClientError, s3_path: str) -> bool:
             exc_info=True
         )
         return False
-
-def create_s3_client(s3_path, region=None, endpoint_url=None, profile=None):
-    """
-    Constructs and returns a boto3 S3 client based on access type.
-
-    :param s3_path: The S3 path being accessed (for logging purposes).
-    :return: A boto3 S3 client instance, or None if client creation fails.
-    """
-
-    # First, check if the object is public
-    try:
-        scheme, bucket_name, object_key, _ = parse_uri(s3_path)
-    except ValueError as e:
-        logger.error(f"Error parsing URI '{s3_path}': {e}")
-        return False
-
-    is_public = check_public_s3_object(s3_path, region=region, endpoint_url=endpoint_url)
-    
-    if is_public:
-        # Public access: initialize client without credentials.
-        if endpoint_url is None:
-            endpoint_url = S3_PROVIDER_ENDPOINT_URLS.get(scheme)
-        try:
-            client = boto3.client(
-                's3',
-                region_name=region,
-                endpoint_url=endpoint_url,
-                config=Config(signature_version=UNSIGNED)
-            )
-            return client
-        except Exception as e:
-            logger.error(f"Error creating anonymous S3 client for '{s3_path}': {e}", exc_info=True)
-            return None
-    else:
-        # Private access: retrieve credentials and initialize client with them.
-        creds = get_aws_credentials(profile)
-        if not creds:
-            logger.error(
-                f"Could not retrieve AWS credentials for accessing '{s3_path}'. "
-                f"Ensure profile '{profile}' is configured correctly."
-            )
-            return None
-
-        # Use passed endpoint_url if provided; otherwise, try credentials or fallback.
-        if endpoint_url is None:
-            endpoint_url = creds.get('endpoint_url', S3_PROVIDER_ENDPOINT_URLS.get(scheme))
-        try:
-            client = boto3.client(
-                's3',
-                region_name=region,
-                aws_access_key_id=creds["aws_access_key_id"],
-                aws_secret_access_key=creds["aws_secret_access_key"],
-                aws_session_token=creds.get("aws_session_token"),
-                endpoint_url=creds.get("endpoint_url") if not endpoint_url else endpoint_url
-            )
-            return client
-        except Exception as e:
-            logger.error(f"Error creating authenticated S3 client for '{s3_path}': {e}", exc_info=True)
-            return None
-            
-
-  
 
 def construct_s3_url_from_s3_uri(s3_path, endpoint_url=None, region=None):
     """Convert s3://bucket-name/object-key into an endpoint_url/bucket-name/bucket-key url
