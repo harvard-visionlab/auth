@@ -38,9 +38,9 @@ def sign_url_if_needed(url, expires_in_seconds=3600, s3_config=None):
         return url
 
     # convert from s3:// to https:// if needed:
+    s3_client = create_s3_client(url, s3_config=s3_config)
     s3_url = convert_to_http_url(url)
     _, bucket_name, bucket_key, _ = parse_uri(s3_url)
-    s3_client = create_s3_client(s3_url, s3_config=s3_config)
     signed_url = s3_client.generate_presigned_url('get_object', 
                                                   Params={'Bucket': bucket_name, 
                                                           'Key': bucket_key},

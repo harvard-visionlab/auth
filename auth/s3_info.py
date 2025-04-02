@@ -17,16 +17,24 @@ from .s3_public import check_public_s3_object
 from .s3_client import create_s3_client
 
 __all__ = [
-    # 'create_s3_client',
+    'check_is_s3_uri',
     'check_s3_file_access',
     'count_objects_in_bucket_prefix',
     'list_objects_in_bucket_prefix',
-    # 'is_bucket_file',
 ]
 
 # Get a logger for this module
 logger = logging.getLogger(__name__) # Use module name for clarity
 
+def check_is_s3_uri(uri):
+    parsed = urlparse(uri)
+    # For non-http/https schemes, we rely on our known S3 providers.
+    if parsed.scheme not in ['http', 'https']:
+        return parsed.scheme in S3_PROVIDER_ENDPOINT_URLS
+    
+    # For http/https schemes, check if 's3' appears in the netloc.
+    return 's3' in parsed.netloc.lower()
+    
 def _log_s3_client_error(e: ClientError, s3_path: str) -> bool:
     """Logs ClientError exceptions from boto3 in a consistent format."""
     error_code = e.response.get("Error", {}).get("Code")

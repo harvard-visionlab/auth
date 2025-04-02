@@ -5,6 +5,7 @@ S3_PROVIDER_ENDPOINT_URLS = {
     "s3": "https://s3.amazonaws.com",
     "aws": "https://s3.amazonaws.com",
     "wasabi": "https://s3.wasabisys.com",
+    "wasabi-admin": "https://s3.wasabisys.com",
     "machina": "https://s3.machina.fas.harvard.edu",
     "valis": "https://s3.valis.fas.harvard.edu"
 }
@@ -90,6 +91,7 @@ def normalize_uri(uri):
     
 def split_name(path: Path):
     """Split a path into the stem and the complete extension (all suffixes)."""
+    path = Path(path)
     suffixes = path.suffixes
     if suffixes:
         ext = "".join(suffixes)
