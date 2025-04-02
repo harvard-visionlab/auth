@@ -29,7 +29,9 @@ def create_s3_client(s3_path, s3_config=None):
 
     if s3_config is None:
         s3_config = {}
-        
+    endpoint_url = s3_config.get('endpoint_url')
+    region = s3_config.get('region')
+
     # First, check if the object is public
     try:
         scheme, bucket_name, object_key, _ = parse_uri(s3_path)
@@ -38,8 +40,8 @@ def create_s3_client(s3_path, s3_config=None):
         return False
 
     is_public = check_public_s3_object(s3_path, 
-                                       region=s3_config.get('region'),
-                                       endpoint_url=s3_config.get('endpoint_url'))
+                                       region=region,
+                                       endpoint_url=endpoint_url)
     
     if is_public:
         # Public access: initialize client without credentials.
@@ -60,8 +62,6 @@ def create_s3_client(s3_path, s3_config=None):
             return None
     else:
         # Private access: retrieve credentials and initialize client with them.
-        endpoint_url = s3_config.get('endpoint_url')
-        region = s3_config.get('region')
         creds = get_aws_credentials_with_provider_hint(scheme,
                                                        profile=s3_config.get('profile'),
                                                        endpoint_url=endpoint_url,
