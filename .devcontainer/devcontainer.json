@@ -1,0 +1,40 @@
+{
+  "name": "auth-dev",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "features": {},
+  "workspaceFolder": "/work/auth",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/work/auth,type=bind,consistency=cached",
+  "postCreateCommand": "uv python install 3.12 && uv venv && source .venv/bin/activate && uv pip install -r requirements-dev.txt && uv pip install -e .",
+  "remoteUser": "vscode",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "claude-code.claude-code"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/work/auth/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.terminal.activateEnvInCurrentTerminal": true,
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "forwardPorts": [8888],
+  "portsAttributes": {
+    "8888": {
+      "label": "JupyterLab"
+    }
+  },
+  "containerEnv": {
+    "AWS_ACCESS_KEY_ID": "${localEnv:AWS_ACCESS_KEY_ID}",
+    "AWS_SECRET_ACCESS_KEY": "${localEnv:AWS_SECRET_ACCESS_KEY}",
+    "AWS_DEFAULT_REGION": "${localEnv:AWS_DEFAULT_REGION}"
+  }
+}

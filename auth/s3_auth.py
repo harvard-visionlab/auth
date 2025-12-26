@@ -15,21 +15,27 @@ def get_aws_credentials_with_provider_hint(provider, profile=None, endpoint_url=
     if profile is not None:
         return get_aws_credentials(profile=profile, endpoint_url=endpoint_url, region=region)
 
+    # When profile is None, first try global environment variables via boto3's default session.
+    # This allows cloud environments (e.g., Lightning AI) that set AWS_ACCESS_KEY_ID etc. to work.
+    try:
+        creds = get_aws_credentials(profile=None, endpoint_url=endpoint_url, region=region)
+        if creds:
+            return creds
+    except ValueError:
+        # Default credentials not available, continue to provider-based lookup
+        pass
+
     # assume a profile named after the provider
-    creds = get_aws_credentials(profile=provider, 
-                                endpoint_url=endpoint_url, 
+    creds = get_aws_credentials(profile=provider,
+                                endpoint_url=endpoint_url,
                                 region=region)
 
-    # try all uppercase (env variable convention
+    # try all uppercase (env variable convention)
     if not creds:
-        creds = get_aws_credentials(profile=provider.upper(), 
-                                    endpoint_url=endpoint_url, 
+        creds = get_aws_credentials(profile=provider.upper(),
+                                    endpoint_url=endpoint_url,
                                     region=region)
 
-    # fallback to default credentials
-    if not creds:
-        creds = get_aws_credentials(profile=profile, endpoint_url=endpoint_url, region=region)
-        
     return creds
         
 def get_aws_credentials(profile=None, endpoint_url=None, region='us-east-1'):
@@ -77,7 +83,13 @@ def get_aws_credentials(profile=None, endpoint_url=None, region='us-east-1'):
     profile_name = profile
     # Get the credentials file path (default: ~/.aws/credentials)
     credentials_path = os.environ.get('AWS_SHARED_CREDENTIALS_FILE', os.path.expanduser('~/.aws/credentials'))
-    config = load_config(credentials_path)
+
+    # Try to load config, but handle missing credentials file gracefully
+    try:
+        config = load_config(credentials_path)
+    except Exception:
+        # Credentials file doesn't exist - treat as empty config
+        config = {}
 
     if profile_name not in config:
         # If profile is all uppercase, try reading credentials from environment variables.
